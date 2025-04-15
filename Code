@@ -1,0 +1,787 @@
+!pip install tensorflow keras pillow pyttsx3 
+!pip install -q kaggle 
+!pip install Opendatasets 
+ 
+import opendatasets as od 
+import pandas 
+data_dir = od.download( 
+    "https://www.kaggle.com/datasets/adityajn105/flickr8k", 
+force='True', 
+    data_dir ='flickr8k_data'  # Specify a different extraction 
+directory 
+) 
+ 
+!pip install gTTS 
+ 
+import tensorflow as tf 
+import numpy as np 
+import json 
+from tensorflow.keras.preprocessing.image import load_img, img_to_array 
+from tensorflow.keras.applications import ResNet50, MobileNet 
+from tensorflow.keras.applications.resnet50 import preprocess_input as 
+preprocess_input_resnet 
+from tensorflow.keras.applications.mobilenet import preprocess_input as 
+preprocess_input_mobilenet 
+from tensorflow.keras.preprocessing.sequence import pad_sequences 
+from tensorflow.keras.models import Model 
+from tensorflow.keras.layers import Input, Dense, LSTM, Embedding, 
+Dropout, Add 
+from gtts import gTTS 
+import pyttsx3 
+import IPython.display as ipd 
+from pycocotools.coco import COCO 
+import requests 
+from io import BytesIO 
+from PIL import Image 
+ 
+data_dir = "/content/flickr8k_data/flickr8k" 
+import pathlib 
+data_dir= pathlib.Path(data_dir)  #to add dataset path in directory 
+data_dir 
+ 
+list(data_dir.glob('*/*.jpg'))[:5] 
+image_count = len(list(data_dir.glob('*/*.jpg'))) 
+print(image_count) 
+ 
+# Load libraries 
+import matplotlib.pyplot as plt 
+import pandas as pd 
+import pickle 
+import numpy as np 
+import os 
+import cv2 
+import keras 
+from keras.applications.resnet50 import ResNet50 
+from keras.optimizers import Adam 
+from keras.layers import Dense, Flatten,Input, Convolution2D, Dropout, 
+LSTM, TimeDistributed, Embedding, Bidirectional, Activation, 
+RepeatVector,Concatenate 
+from keras.models import Sequential, Model 
+# np_utils has been moved to tensorflow.keras.utils 
+from tensorflow.keras.utils import to_categorical 
+import random 
+from keras.preprocessing import image, sequence 
+import matplotlib.pyplot as plt 
+from tensorflow.keras.applications.resnet50 import preprocess_input as 
+preprocess_resnet50, decode_predictions as decode_resnet50 
+from tensorflow.keras.applications.mobilenet import preprocess_input as 
+preprocess_mobilenet, decode_predictions as decode_mobilenet 
+from tensorflow.keras.applications import ResNet50, MobileNet 
+from tensorflow.keras.layers import GlobalAveragePooling2D, 
+Concatenate, Dense 
+from tensorflow.keras.models import Model 
+import torch 
+from transformers import BlipProcessor, BlipForConditionalGeneration 
+from PIL import Image 
+import requests 
+from gtts import gTTS 
+import IPython.display as ipd 
+ 
+# Load the BLIP processor and model 
+processor = BlipProcessor.from_pretrained("Salesforce/blip-image
+captioning-base") 
+model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip
+image-captioning-base") 
+ 
+def load_and_preprocess_image(img_path, target_size): 
+    img = image.load_img(img_path, target_size=target_size) 
+    img_array = image.img_to_array(img) 
+    img_array = np.expand_dims(img_array, axis=0) 
+    return img_array 
+ 
+# Function to add prefix to layer names 
+def add_prefix_to_layers(model, prefix): 
+    for layer in model.layers: 
+        layer._name = prefix + layer.name 
+ 
+# Load Pretrained Models 
+resnet_model = ResNet50(weights='imagenet', include_top=False) 
+add_prefix_to_layers(resnet_model, "resnet_") 
+ 
+mobilenet_model = MobileNet(weights='imagenet', include_top=False) 
+add_prefix_to_layers(mobilenet_model, "mobilenet_") 
+ 
+# Load Pretrained Models 
+resnet_model = ResNet50(weights='imagenet', include_top=False) 
+mobilenet_model = MobileNet(weights='imagenet', include_top=False) 
+ 
+ 
+img_path = 
+"/content/flickr8k_data/flickr8k/Images/1007320043_627395c3d8.jpg"  # 
+Removed extra '.jpg' from the file name 
+img_resnet50 = preprocess_resnet50(load_and_preprocess_image(img_path, 
+target_size=(224, 224))) 
+img_mobilenet = 
+preprocess_mobilenet(load_and_preprocess_image(img_path, 
+target_size=(224, 224))) 
+ 
+def create_hybrid_model(): 
+    resnet_input = Input(shape=(224, 224, 3), name='resnet_input') 
+    mobilenet_input = Input(shape=(224, 224, 3), 
+name='mobilenet_input') 
+ 
+    resnet_output = resnet_model(resnet_input) 
+    mobilenet_output = mobilenet_model(mobilenet_input) 
+ 
+    x_resnet50 = GlobalAveragePooling2D()(resnet_output) 
+    x_mobilenet = GlobalAveragePooling2D()(mobilenet_output) 
+ 
+    concatenated = Concatenate()([x_resnet50, x_mobilenet]) 
+    predictions = Dense(1000, activation='softmax')(concatenated) 
+ 
+    model = Model(inputs=[resnet_input, mobilenet_input], 
+outputs=predictions) 
+    return model 
+ 
+hybrid_model = create_hybrid_model() 
+ 
+ 
+def load_and_preprocess_image(img_path, target_size): 
+    img = image.load_img(img_path, target_size=target_size) 
+    img_array = image.img_to_array(img) 
+    img_array = np.expand_dims(img_array, axis=0) 
+    return img_array 
+ 
+img_path = 
+'/content/flickr8k_data/flickr8k/Images/1001773457_577c3a7d70.jpg'  # 
+replace with your image path 
+img_resnet50 = preprocess_resnet50(load_and_preprocess_image(img_path, 
+target_size=(224, 224))) 
+img_mobilenet = 
+preprocess_mobilenet(load_and_preprocess_image(img_path, 
+target_size=(224, 224))) 
+ 
+# Make prediction 
+preds = hybrid_model.predict([img_resnet50, img_mobilenet]) 
+predicted_class = np.argmax(preds[0]) 
+ 
+# Load ImageNet labels 
+!wget 
+https://storage.googleapis.com/download.tensorflow.org/data/imagenet_cl
+ ass_index.json 
+import json 
+with open('imagenet_class_index.json', 'r') as f: 
+    class_dict = json.load(f) 
+class_labels = {int(key): value[1] for key, value in 
+class_dict.items()} 
+ 
+predicted_label = class_labels[predicted_class] 
+print("Predicted label:", predicted_label) 
+ 
+# Extract Features 
+features = hybrid_model.predict([img_resnet50, img_mobilenet]) 
+ 
+# Ensure transformers library is installed 
+!pip install -q transformers 
+ 
+from transformers import GPT2Tokenizer, TFGPT2LMHeadModel 
+ 
+# Load the tokenizer and the model 
+tokenizer = GPT2Tokenizer.from_pretrained("gpt2") 
+captioning_model = TFGPT2LMHeadModel.from_pretrained("gpt2") 
+ 
+# Prepare input for the model 
+input_ids = tokenizer.encode("Features: ", return_tensors="tf") 
+ 
+# Generate caption 
+output = captioning_model.generate(input_ids, max_length=50, 
+num_return_sequences=1) 
+caption = tokenizer.decode(output[0], skip_special_tokens=True) 
+ 
+print("Generated caption:", caption) 
+ 
+# Load and preprocess image 
+img_path = 
+"/content/flickr8k_data/flickr8k/Images/103195344_5d2dc613a3.jpg"  # 
+Local file path 
+img = Image.open(img_path) # Open the image directly 
+inputs = processor(img, return_tensors="pt") 
+ 
+!pip install -q transformers 
+from transformers import BlipForConditionalGeneration 
+ 
+# Assuming 'model' was originally a PretrainedResNetModel, replace it 
+with: 
+model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip
+image-captioning-base") 
+ 
+# Now, the 'generate' method should be available 
+output = model.generate(**inputs) 
+caption = processor.decode(output[0], skip_special_tokens=True) 
+ 
+print("Generated caption:", caption) 
+ 
+!pip install googletrans==4.0.0-rc1 gtts 
+ 
+# Generate speech from the caption 
+def text_to_speech(text, lang='fr'): 
+    tts = gTTS(text=text, lang=lang) 
+    tts.save("output.mp3") 
+    return "output.mp3" 
+voice_output = text_to_speech(caption) 
+ipd.display(ipd.Audio(voice_output)) 
+ 
+from googletrans import Translator 
+from gtts import gTTS 
+import IPython.display as ipd 
+ 
+# Prompt user for language code 
+def get_language_code(): 
+    # List of language codes for common languages 
+    languages = { 
+        'English': 'en', 
+        'Spanish': 'es', 
+        'French': 'fr', 
+        'German': 'de', 
+        'Chinese': 'zh', 
+        'Italian': 'it', 
+        'Hindi': 'hi', # Added Hindi language 
+        'Bangla': 'bn', # Added Bengali language 
+        'Telugu': 'te', # Added Telugu language 
+        'Marathi': 'mr', 
+        'Tamil': 'ta', 
+        'Gujarati': 'gu', 
+        'Kannada': 'kn', 
+        'Malayalam': 'ml', 
+        'Punjabi': 'pa', 
+        'Odia': 'or', 
+        'Assamese': 'as', 
+        'Urdu': 'ur', 
+        'Sanskrit': 'sa', 
+        'Konkani': 'kok', 
+        'Maithili': 'mai', 
+        'Manipuri': 'mni', 
+        'Bodo': 'brx', 
+        'Santali': 'sat', 
+        'Dogri': 'doi', 
+        'Kashmiri': 'ks' 
+ 
+    } 
+ 
+    print("Available languages:") 
+    for lang_name, lang_code in languages.items(): 
+        print(f"{lang_name}: {lang_code}") 
+ 
+    lang_choice = input("Enter the language code (e.g., 'en', 'es'): 
+").strip() 
+    return lang_choice if lang_choice in languages.values() else 
+'en'  # Default to 'en' if not found 
+ 
+# Translate text to the desired language 
+def translate_text(text, dest_lang): 
+    translator = Translator() 
+    translated = translator.translate(text, dest=dest_lang) 
+    return translated.text 
+ 
+# Convert text to speech 
+def text_to_speech(text, lang='en'): 
+    tts = gTTS(text=text, lang=lang) 
+    tts.save('caption.mp3') 
+    return 'caption.mp3' 
+language_code = get_language_code()  # Get language code from user 
+translated_caption = translate_text(caption, language_code)  # 
+Translate caption 
+print(f"Translated Caption: {translated_caption}") 
+voice_output = text_to_speech(translated_caption, 
+lang=language_code)  # Generate speech 
+ 
+# Play the audio 
+ipd.display(ipd.Audio(voice_output)) 
+ 
+ 
+import torch 
+import torch.nn as nn 
+import torch.optim as optim 
+from torch.utils.data import DataLoader, TensorDataset, random_split 
+from sklearn.preprocessing import StandardScaler 
+import numpy as np 
+import torchvision.transforms as transforms 
+ 
+# Placeholder - Replace these with your actual data 
+x_data = torch.randn(100, 3, 224, 224)  # Example: 100 samples with 3 
+channels (RGB) and 224x224 dimensions 
+y_data = torch.randint(0, 2, (100, 1)).float()  # Example: 100 binary 
+target values 
+ 
+# Normalize data 
+scaler = StandardScaler() 
+# Flatten the x_data to 2D for scaler and then reshape back to 4D 
+x_data_reshaped = x_data.view(x_data.size(0), -1) 
+x_data_reshaped = scaler.fit_transform(x_data_reshaped) 
+x_data = torch.tensor(x_data_reshaped).view(x_data.size()) 
+ 
+# Create a dataset 
+dataset = TensorDataset(x_data, y_data) 
+ 
+# Split the data into train and test sets (80-20 split) 
+train_size = int(0.8 * len(x_data)) 
+test_size = len(x_data) - train_size 
+train_dataset, test_dataset = random_split(dataset, [train_size, 
+test_size]) 
+ 
+ 
+from torchvision import models 
+ 
+class PretrainedResNetModel(nn.Module): 
+    def __init__(self): 
+        super(PretrainedResNetModel, self).__init__() 
+        self.resnet = models.resnet50(pretrained=True) 
+        self.resnet.fc = nn.Linear(self.resnet.fc.in_features, 1) 
+        self.sigmoid = nn.Sigmoid() 
+ 
+    def forward(self, x): 
+        x = self.resnet(x) 
+        x = self.sigmoid(x) 
+        return x 
+ 
+# Initialize model, loss function, and optimizer 
+model = PretrainedResNetModel() 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
+model.to(device) 
+criterion = nn.BCELoss() 
+optimizer = optim.Adam(model.parameters(), lr=0.0001)  # Lower learning 
+rate for fine-tuning 
+ 
+from torchvision.transforms import ToTensor, Normalize, Compose, Resize 
+from torch.utils.data import DataLoader, Dataset 
+ 
+class CustomDataset(Dataset): 
+    def __init__(self, dataset, transform=None): 
+        self.dataset = dataset 
+        self.transform = transform 
+ 
+    def __len__(self): 
+        return len(self.dataset) 
+ 
+    def __getitem__(self, idx): 
+        x, y = self.dataset[idx] 
+        if self.transform: 
+            x = self.transform(x) 
+        return x, y 
+ 
+# Define the transformations 
+transform = Compose([ 
+    Resize((224, 224)),  # Resize images to 224x224 
+    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 
+ImageNet mean and std 
+]) 
+ 
+# Create the DataLoader 
+train_loader = DataLoader(CustomDataset(train_dataset, 
+transform=transform), batch_size=32, shuffle=True) 
+test_loader = DataLoader(CustomDataset(test_dataset, 
+transform=transform), batch_size=32, shuffle=False) 
+ 
+import torch 
+import torch.nn as nn 
+import torch.optim as optim 
+from torch.utils.data import DataLoader, TensorDataset, random_split 
+from sklearn.preprocessing import StandardScaler 
+import numpy as np 
+import torchvision.transforms as transforms 
+ 
+# Placeholder - Replace these with your actual data 
+x_data = torch.randn(100, 3, 224, 224)  # Example: 100 samples with 3 
+channels (RGB) and 224x224 dimensions 
+y_data = torch.randint(0, 2, (100, 1)).float()  # Example: 100 binary 
+target values 
+ 
+# Create a dataset (Do not normalize yet) 
+dataset = TensorDataset(x_data, y_data) 
+ 
+# Split the data into train and test sets (80-20 split) 
+train_size = int(0.8 * len(x_data)) 
+test_size = len(x_data) - train_size 
+train_dataset, test_dataset = random_split(dataset, [train_size, 
+test_size]) 
+ 
+from torchvision import models 
+ 
+class PretrainedResNetModel(nn.Module): 
+    def __init__(self): 
+        super(PretrainedResNetModel, self).__init__() 
+        self.resnet = models.resnet50(pretrained=True) 
+        self.resnet.fc = nn.Linear(self.resnet.fc.in_features, 1) 
+        self.sigmoid = nn.Sigmoid() 
+ 
+    def forward(self, x): 
+        x = self.resnet(x) 
+        x = self.sigmoid(x) 
+        return x 
+ 
+# Initialize model, loss function, and optimizer 
+model = PretrainedResNetModel() 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
+model.to(device) 
+criterion = nn.BCELoss() 
+optimizer = optim.Adam(model.parameters(), lr=0.0001)  # Lower learning 
+rate for fine-tuning 
+ 
+from torchvision.transforms import ToTensor, Normalize, Compose, Resize 
+from torch.utils.data import DataLoader, Dataset 
+ 
+class CustomDataset(Dataset): 
+    def __init__(self, x, y, transform=None): 
+        self.x = x 
+        self.y = y 
+        self.transform = transform 
+ 
+    def __len__(self): 
+        return len(self.x) 
+ 
+    def __getitem__(self, idx): 
+        x = self.x[idx] 
+        y = self.y[idx] 
+        # Ensure x is in the shape [C, H, W] before applying transforms 
+        if x.dim() == 2:  # If it's a 2D tensor, assume it's grayscale 
+and add a channel dimension 
+            x = x.unsqueeze(0) 
+        if self.transform: 
+            x = self.transform(x) 
+        return x, y 
+ 
+# Define the transformations - Remove ToTensor as the data is already 
+in Tensor format 
+transform = Compose([ 
+    Resize((224, 224)),  # Resize images to 224x224 
+    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 
+ImageNet mean and std 
+]) 
+ 
+# Create the DataLoader 
+train_loader = 
+DataLoader(CustomDataset(train_dataset.dataset.tensors[0], 
+train_dataset.dataset.tensors[1], transform=transform), batch_size=32, 
+shuffle=True) 
+test_loader = DataLoader(CustomDataset(test_dataset.dataset.tensors[0], 
+test_dataset.dataset.tensors[1], transform=transform), batch_size=32, 
+shuffle=False) 
+        # Continue with the rest of your training loop logic here 
+ 
+# Define the model with Pretrained ResNet 
+class PretrainedResNetModel(nn.Module): 
+    def __init__(self): 
+        super(PretrainedResNetModel, self).__init__() 
+        self.resnet = models.resnet50(pretrained=True) 
+        self.resnet.fc = nn.Linear(self.resnet.fc.in_features, 1) 
+        self.sigmoid = nn.Sigmoid() 
+ 
+    def forward(self, x): 
+        x = self.resnet(x) 
+        x = self.sigmoid(x) 
+        return x 
+ 
+# Initialize model, loss function, and optimizer 
+model = PretrainedResNetModel().to(torch.float32)  # Ensure model 
+parameters are in float32 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
+model.to(device) 
+ 
+# Define loss function and optimizer 
+criterion = nn.BCELoss().to(device)  # Ensure loss function is on the 
+correct device 
+optimizer = optim.Adam(model.parameters(), lr=0.0001) 
+ 
+# Convert data tensors to float32 
+x_data = torch.tensor(x_data, dtype=torch.float32) 
+y_data = torch.tensor(y_data, dtype=torch.float32) 
+ 
+# Training loop 
+epochs = 10 
+for epoch in range(epochs): 
+    model.train() 
+    epoch_loss = 0 
+    for batch_x, batch_y in train_loader: 
+        batch_x, batch_y = batch_x.to(device).to(torch.float32), 
+batch_y.to(device).to(torch.float32) 
+ 
+        optimizer.zero_grad()  # Zero the gradients 
+        outputs = model(batch_x)  # Forward pass 
+        loss = criterion(outputs, batch_y)  # Compute loss 
+        loss.backward()  # Backward pass 
+        optimizer.step()  # Update weights 
+ 
+        epoch_loss += loss.item() 
+ 
+    epoch_loss /= len(train_loader) 
+    print(f"Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}") 
+ 
+# Evaluate the model 
+# Evaluate the model 
+from sklearn.metrics import accuracy_score, precision_score, 
+recall_score, f1_score # Import necessary metrics 
+ 
+model.eval() 
+y_true = [] 
+y_pred = [] 
+ 
+with torch.no_grad(): 
+    for batch_x, batch_y in test_loader: 
+        batch_x, batch_y = batch_x.to(device).to(torch.float32), 
+batch_y.to(device).to(torch.float32) 
+        outputs = model(batch_x).cpu().numpy() 
+        y_true.extend(batch_y.cpu().numpy()) 
+        y_pred.extend(outputs) 
+ 
+# Convert predictions to binary (0 or 1) 
+y_pred = (np.array(y_pred) > 0.5).astype(int) 
+y_true = np.array(y_true).astype(int) 
+ 
+# Calculate metrics 
+accuracy = accuracy_score(y_true, y_pred) 
+precision = precision_score(y_true, y_pred) 
+recall = recall_score(y_true, y_pred) 
+f1 = f1_score(y_true, y_pred) 
+ 
+print(f"Accuracy: {accuracy:.4f}") 
+print(f"Precision: {precision:.4f}") 
+print(f"Recall: {recall:.4f}") 
+print(f"F1 Score: {f1:.4f}") 
+ 
+# Plot metrics 
+import matplotlib.pyplot as plt 
+ 
+metrics = { 
+    'Accuracy': accuracy, 
+    'Precision': precision, 
+    'Recall': recall, 
+    'F1 Score': f1 
+} 
+ 
+plt.figure(figsize=(10, 6)) 
+plt.bar(metrics.keys(), metrics.values(), color=['b', 'g', 'r', 'c']) 
+plt.title('Evaluation Metrics') 
+plt.ylabel('Score') 
+plt.ylim(0, 1) 
+plt.grid(True) 
+plt.show() 
+ 
+ 
+def calculate_mcc(tp, tn, fp, fn): 
+    """ 
+    Calculate the Matthews Correlation Coefficient (MCC). 
+ 
+    Parameters: 
+    tp (int): True Positives 
+    tn (int): True Negatives 
+    fp (int): False Positives 
+    fn (int): False Negatives 
+ 
+    Returns: 
+    float: The MCC score 
+    """ 
+    # Calculate the MCC 
+    numerator = (tp * tn) - (fp * fn) 
+    denominator = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + 
+fn)) 
+ 
+    if denominator == 0: 
+        return 0.0  # Return 0 if the denominator is zero to avoid 
+division by zero 
+ 
+    return numerator / denominator 
+ 
+# Calculate tp, tn, fp, fn from y_true and y_pred 
+from sklearn.metrics import confusion_matrix 
+tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel() 
+ 
+mcc_score = calculate_mcc(tp, tn, fp, fn) 
+print(f'MCC Score: {mcc_score:.4f}') 
+ 
+import os 
+import numpy as np 
+ 
+# Define paths (replace with your actual paths) 
+images_path = '/content/flickr8k_data/flickr8k/Images' 
+captions_file = '/content/flickr8k_data/flickr8k/captions.txt' 
+ 
+# Load captions 
+captions = {} 
+with open(captions_file, 'r') as f: 
+    for line in f: 
+        # Check if the line contains the delimiter and split 
+accordingly 
+        if '\t' in line: 
+            image_id, caption = line.strip().split('\t') 
+            image_id = image_id[:-2]  # Remove the #0, #1, etc. 
+            if image_id not in captions: 
+                captions[image_id] = [] 
+            captions[image_id].append(caption) 
+        # Handle lines without the delimiter (e.g., print them for 
+inspection) 
+        else: 
+            print(f"Skipping line without tab delimiter: {line}") 
+ 
+# Load images 
+images = [] 
+captions_list = [] 
+for image_id in captions: 
+    image_path = os.path.join(images_path, image_id) 
+    if os.path.exists(image_path): 
+        images.append(image_path) 
+        captions_list.append(captions[image_id]) 
+ 
+# Example output 
+print(f"Loaded {len(images)} images and {len(captions_list)} caption 
+sets.") 
+ 
+print(type(images), len(images)) 
+print(type(captions_list), len(captions_list)) 
+ 
+# Define your evaluate_model function based on how your model works 
+def evaluate_model(image_paths, caption_sets): 
+    # Placeholder for the real evaluation logic 
+    # This function should return the true labels and predictions 
+    true_labels = []  # Should contain the actual labels for each image 
+    predictions = []  # Should contain model predictions for each image 
+    return true_labels, predictions 
+ 
+ 
+import numpy as np 
+import matplotlib.pyplot as plt 
+from sklearn.metrics import accuracy_score, precision_score, 
+recall_score, f1_score, matthews_corrcoef 
+from time import time 
+ 
+# Define a range of sample sizes 
+sample_sizes = np.linspace(100, len(images), 10, dtype=int) 
+ 
+# Initialize lists to store metrics 
+accuracy = [] 
+precision = [] 
+recall = [] 
+f1_scores = [] 
+mcc = [] 
+prediction_delays = [] 
+ 
+for size in sample_sizes: 
+    # Create a subset of the dataset 
+    subset_images = images[:size] 
+    # Convert dictionary keys to a list and then slice it 
+    subset_captions = list(captions.keys())[:size] 
+ 
+    # Measure the prediction time 
+    start_time = time() 
+    # Make sure your evaluate_model function expects a list of image 
+keys for subset_captions 
+    true_labels, predictions = evaluate_model(subset_images, 
+subset_captions) 
+    end_time = time() 
+ 
+    # Calculate metrics 
+    accuracy.append(accuracy_score(true_labels, predictions)) 
+    precision.append(precision_score(true_labels, predictions, 
+average='weighted')) 
+    recall.append(recall_score(true_labels, predictions, 
+average='weighted')) 
+    f1_scores.append(f1_score(true_labels, predictions, 
+average='weighted')) 
+    mcc.append(matthews_corrcoef(true_labels, predictions)) 
+    prediction_delays.append((end_time - start_time) / size)  # Average 
+prediction delay per sample 
+ 
+# Plot Sample Size vs. Matthews Correlation Coefficient 
+plt.subplot(2, 3, 5) 
+plt.plot(sample_sizes, mcc, marker='o') 
+plt.title('Sample Size vs. MCC') 
+plt.xlabel('Sample Size') 
+plt.ylabel('Matthews Correlation Coefficient') 
+ 
+# Plot Sample Size vs. Prediction Delay 
+plt.subplot(2, 3, 6) 
+plt.plot(sample_sizes, prediction_delays, marker='o') 
+plt.title('Sample Size vs. Prediction Delay') 
+plt.xlabel('Sample Size') 
+plt.ylabel('Prediction Delay (s)') 
+ 
+plt.tight_layout() 
+plt.show() 
+ 
+y_pred_proba = model(batch_x).detach().cpu().numpy()  # Store 
+probabilities 
+# Evaluate the model 
+from sklearn.metrics import accuracy_score, precision_score, 
+recall_score, f1_score, roc_curve, auc 
+ 
+model.eval() 
+y_true = [] 
+y_pred = [] 
+y_pred_proba = []  # Store probabilities for all batches 
+ 
+with torch.no_grad(): 
+    for batch_x, batch_y in test_loader: 
+        batch_x, batch_y = batch_x.to(device).to(torch.float32), 
+batch_y.to(device).to(torch.float32) 
+        outputs = model(batch_x) 
+        y_true.extend(batch_y.cpu().numpy()) 
+        y_pred.extend(outputs.cpu().numpy() > 0.5)  # Directly store 
+binary predictions 
+        y_pred_proba.extend(outputs.cpu().numpy())  # Store 
+probabilities 
+ 
+# Convert lists to numpy arrays 
+y_true = np.array(y_true).astype(int) 
+y_pred = np.array(y_pred).astype(int) 
+y_pred_proba = np.array(y_pred_proba).squeeze()  # Squeeze to get a 1D 
+array of probabilities 
+ 
+# Calculate ROC curve and AUC 
+fpr, tpr, thresholds = roc_curve(y_true, y_pred_proba) 
+roc_auc = auc(fpr, tpr) 
+print(f'ROC AUC: {roc_auc:.4f}') 
+ 
+import matplotlib.pyplot as plt 
+ 
+plt.figure() 
+plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area 
+= %0.2f)' % roc_auc) 
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--') 
+plt.xlim([0.0, 1.0]) 
+plt.ylim([0.0, 1.05]) 
+plt.xlabel('False Positive Rate') 
+plt.ylabel('True Positive Rate') 
+plt.title('Receiver Operating Characteristic') 
+plt.legend(loc="lower right") 
+plt.show() 
+ 
+import numpy as np 
+ 
+variance = np.var(y_pred_proba) 
+print("Variance of model predictions:", variance) 
+ 
+def count_layers(model): 
+    """Counts the number of layers in a PyTorch model.""" 
+    layer_count = 0 
+    for name, module in model.named_modules(): 
+        if isinstance(module, (torch.nn.Linear, torch.nn.Conv2d, 
+torch.nn.BatchNorm2d, torch.nn.ReLU, torch.nn.MaxPool2d)):  # Add other 
+layer types as needed 
+            layer_count += 1 
+    return layer_count 
+ 
+num_layers = count_layers(model) 
+print(f"The model has {num_layers} layers.") 
+ 
+# Assuming 'model' is your PyTorch model, 'test_data', and 
+'test_labels' are your test data 
+import torch 
+ 
+# Define your loss function 
+criterion = torch.nn.CrossEntropyLoss() 
+ 
+# ... (Your PyTorch evaluation loop) 
+model.eval()  # Set model to evaluation mode 
+with torch.no_grad(): 
+    outputs = model(x_data) 
+    # Assuming 'predicted_label' should be a tensor of class indices 
+    # Replace this with the actual way to get the correct class indices 
+for your data 
+    predicted_label = torch.tensor([0] * len(outputs))  # Example: all 
+samples belong to class 0 
+    loss = criterion(outputs, predicted_label) 
+    _, predicted = torch.max(outputs, 1) 
+    top1_accuracy = (predicted == predicted_label).sum().item() / 
+len(predicted_label) 
+ 
+print("Test Loss:",loss.item()) 
+print("Top-1 Accuracy:", top1_accuracy)
